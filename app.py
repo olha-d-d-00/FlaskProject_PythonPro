@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 
 app = Flask(__name__)
 
@@ -85,6 +85,27 @@ def user_list_item(user_id, list_id):
 @app.route('/users/<user_id>/list/<list_id>/<film_id>', methods=['DELETE'])
 def user_list_item_delete(user_id, list_id, film_id):
     return f'User {user_id} list item {list_id} deleted'
+
+@app.get('/login')
+def login_page():
+    return render_template('login.html')
+
+app.post('/login')
+def users_login():
+    return 'Login'
+
+app.get('/logout')
+def users_logout():
+    return 'Logout'
+
+@app.get('/register')
+def register_page():
+    return render_template('register.html')
+
+@app.post('/register')
+def users_register():
+    return 'Register'
+
 
 
 if __name__ == '__main__':
