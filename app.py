@@ -1,7 +1,9 @@
+from click import password_option
 from flask import Flask, render_template
-from flask import request
+from flask import request, session
 import sqlite3
 app = Flask(__name__)
+app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
 def film_dictionary(cursor, row):
     d = {}
@@ -39,35 +41,15 @@ def main_page():  # put application's code here
        result = cur.execute("SELECT * FROM film order by added_at desc limit 10").fetchall()
 
     # result = get_db_result('SELECT id, poster, name FROM film order by added_at desc limit 10')
-    return result
+    for one_film in result:
+        print(one_film['name'])
+        print(one_film['year'])
+        print(one_film['rating'])
+    return render_template('main.html', films=result)
 
 @app.route('/register', methods=['GET'])
 def register_page():
-    return """
-    <form action="/register" method="post">
-    
-    <label for="fname">First name:</label><br>
-    <input type="text" id="fname" name="fname"><br>
-    
-    <label for="lname">Last name:</label><br>
-    <input type="text" id="lname" name="lname"><br>
-    
-    <label for="password">Password:</label><br>
-    <input type="password" id="password" name="password"><br>
-    
-    <label for="login">Login:</label><br>
-    <input type="text" id="login" name="login"><br>
-    
-    <label for="email">Email:</label><br>
-    <input type="email" id="email" name="email"><br>
-    
-    <label for="birth_day">Birth date:</label><br>
-    <input type="date" id="birth_day" name="birth_date"><br>
-    
-    
-    <input type="submit" value="Submit">
-    </form>
-    """
+    return render_template('register.html')
 
 
 @app.route('/register', methods=['POST'])
@@ -83,21 +65,67 @@ def user_register():
                     (first_name, last_name, password, login, email, birth_date))
     return 'Register'
 
-@app.post('/login')
+@app.route('/login', methods=['GET'])
 def user_login():
-    return 'Login'
+    return render_template('login.html')
+
+
+@app.route('/login', methods=['POST'])
+def user_login_post():
+    login = request.form['login']
+    password = request.form['password']
+    with db_connection() as cur:
+        cur.execute('SELECT * FROM user WHERE login=? AND password=?', (login, password))
+        result = cur.fetchone()
+    if result:
+        session['logged_in'] = True
+        session['user_id'] = result['id']
+        return f'Login with user {result}'
+    return 'Login failed'
 
 @app.route('/logout', methods=['GET'])
 def user_logout():
+    session.clear()
     return 'Logout'
 
-@app.route('/user/<user_id>', methods=['GET', 'PATCH'])
+@app.route('/user/<user_id>', methods=['GET', 'POST'])
 def user_profile(user_id):
-    return f'User {user_id}'
+    session_user_id = session.get('user_id')
+    if request.method =='POST':
+        if int(user_id) != session_user_id:
+            return 'You can edit only your profile'
 
-@app.route('/user/<user_id>', methods=['DELETE'])
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        email = request.form['email']
+        birth_date = request.form['birth_date']
+        phone = request.form['phone']
+        photo = request.form['photo']
+        password = request.form['password']
+        additional_info = request.form['additional_info']
+        with db_connection() as cur:
+            cur.execute(f"UPDATE user SET first_name='{first_name}', last_name='{last_name}', email='{email}', birth_date='{birth_date}', phone_number='{phone}', photo='{photo}', password='{password}', additional_info='{additional_info}' WHERE id={user_id}")
+        return f'User {user_id} updated'
+    else:
+        with db_connection() as cur:
+            cur.execute(f'SELECT * FROM user WHERE id={user_id}')
+            user_by_id = cur.fetchone()
+
+            if session_user_id is None:
+                user_by_session = 'No user in session'
+            else:
+                cur.execute(f'SELECT * FROM user WHERE id={session_user_id}')
+                user_by_session = cur.fetchone()
+        return render_template('user_page.html', user=user_by_id, user_session=user_by_session)
+        return f'You logged in as {user_by_session}, user {user_id}, data: {user_by_id}'
+
+@app.route('/user/<user_id>/delete', methods=['GET'])
 def user_delete(user_id):
-    return f'User {user_id} delete'
+    session_user_id = session.get('user_id')
+    if user_id == session_user_id:
+        return f'User {user_id} delete'
+    else:
+        return 'You can delete only your profile'
 
 @app.route('/films', methods=['GET'])
 def films():
@@ -113,8 +141,7 @@ def film_info(film_id):
     with db_connection() as cur:
         result = cur.execute(f"SELECT * FROM film where id={film_id}").fetchall()
         actors = cur.execute(f"SELECT * FROM actor join actor_film on actor.id == actor_film.actor_id where actor_film.film_id={film_id}").fetchall()
-        genres = get_db_result(f"SELECT * FROM genre_film where film_id={film_id}").fetchall()
-
+        genres = get_db_result(f"SELECT * FROM genre_film where film_id={film_id}")
 
     # result = get_db_result(f"SELECT * FROM film where id={film_id}")
     # actors = get_db_result(f"SELECT * FROM actor join actor_film on actor.id == actor_film.actor_id where actor_film.film_id={film_id}")
