@@ -119,7 +119,6 @@ def user_profile(user_id):
         return render_template('user_page.html', user=user_by_id, user_session=user_by_session)
 
 
-
 @app.route('/user/<user_id>/delete', methods=['GET'])
 def user_delete(user_id):
     session_user_id = session.get('user_id')
