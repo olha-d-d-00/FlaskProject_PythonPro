@@ -117,7 +117,7 @@ def user_profile(user_id):
                 cur.execute(f'SELECT * FROM user WHERE id={session_user_id}')
                 user_by_session = cur.fetchone()
         return render_template('user_page.html', user=user_by_id, user_session=user_by_session)
-        return f'You logged in as {user_by_session}, user {user_id}, data: {user_by_id}'
+
 
 @app.route('/user/<user_id>/delete', methods=['GET'])
 def user_delete(user_id):
