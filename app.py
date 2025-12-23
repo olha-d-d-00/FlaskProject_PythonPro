@@ -1,5 +1,7 @@
+import functools
+
 from click import password_option
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from flask import request, session
 import sqlite3
 app = Flask(__name__)
@@ -35,7 +37,17 @@ def get_db_result(query):
     return result
 
 
+def decorator_check_login(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if 'logged_in' in session:
+            return func(*args, **kwargs)
+        else:
+            return redirect(url_for('user_login'))
+    return wrapper
+
 @app.route('/')
+@decorator_check_login
 def main_page():  # put application's code here
     with db_connection() as cur:
        result = cur.execute("SELECT * FROM film order by added_at desc limit 10").fetchall()
@@ -84,6 +96,7 @@ def user_login_post():
     return 'Login failed'
 
 @app.route('/logout', methods=['GET'])
+@decorator_check_login
 def user_logout():
     session.clear()
     return 'Logout'
@@ -128,10 +141,22 @@ def user_delete(user_id):
     else:
         return 'You can delete only your profile'
 
-@app.route('/films', methods=['GET'])
+@app.route('/films', methods=['GET']) # /films?name=fhuf&year=2024&country=Ukraine -> select * from film where name like '%fhuf%' and year=2024 and country=Ukraine
 def films():
-    result = get_db_result('SELECT id, poster, name FROM film order by added_at desc')
-    return result
+    filter_params = request.args
+    filter_list_text = []
+    for key, value in filter_params.items():
+        if value:
+            if key == 'name':
+                filter_list_text.append(f"name like'%{value}%'")
+            else:
+                filter_list_text.append(f"{key}='{value}'")
+    additional_filter = ""
+    if filter_params:
+        additional_filter = "where " + " and ".join(filter_list_text)
+    result = get_db_result(f'SELECT * FROM film {additional_filter} order by added_at desc')
+    countries = get_db_result("SELECT * FROM country")
+    return render_template('films.html', films=result, countries=countries)
 
 @app.route('/films', methods=['POST'])
 def film_add():
