@@ -145,18 +145,48 @@ def user_delete(user_id):
 def films():
     filter_params = request.args
     filter_list_text = []
+
+    special_keys = {'actor', 'genre'}
+
     for key, value in filter_params.items():
         if value:
+
+            if key in special_keys:
+                continue
+
             if key == 'name':
                 filter_list_text.append(f"name like'%{value}%'")
             else:
                 filter_list_text.append(f"{key}='{value}'")
+
+    joins = []
+
+    genre = filter_params.get('genre')
+    actor = filter_params.get('actor')
+
+    if genre:
+        joins.append("JOIN genre_film ON genre_film.film_id = film.id")
+        filter_list_text.append(f"genre_film.genre_id='{genre}'")
+
+    if actor:
+        joins.append("JOIN actor_film ON actor_film.film_id = film.id")
+        joins.append("JOIN actor ON actor.id = actor_film.actor.actor_id")
+        filter_list_text.append(
+            f"(actor.first_name like '%{actor}%' OR actor.last_name like '%{actor}%')"
+        )
+
     additional_filter = ""
     if filter_params:
         additional_filter = "where " + " and ".join(filter_list_text)
-    result = get_db_result(f'SELECT * FROM film {additional_filter} order by added_at desc')
+
+    join_part = " ".join(joins)
+    if joins:
+        result = get_db_result(f"SELECT DISTINCT film.* FROM film {join_part} {additional_filter} order by film.added_at desc")
+    else:
+        result = get_db_result(f'SELECT * FROM film {additional_filter} order by film.added_at desc')
+    genres = get_db_result("SELECT * FROM genre")
     countries = get_db_result("SELECT * FROM country")
-    return render_template('films.html', films=result, countries=countries)
+    return render_template('films.html', films=result, countries=countries, genres=genres)
 
 @app.route('/films', methods=['POST'])
 def film_add():

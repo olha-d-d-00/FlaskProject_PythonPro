@@ -11,10 +11,20 @@
     <input type="text" name="year">
     <input type="text" name="rating">
     <select name="country" id="country">
+        <option value="">-- any country --</option>
         {% for country in countries %}
             <option value="{{ country['country_name'] }}">{{ country['country_name'] }}</option>>
         {% endfor %}
     </select>
+
+    <select name="genre" id="genre">
+        <option value="">-- any genre --</option>
+        {% for one_genre in genres %}
+            <option value="{{ one_genre['genre'] }}">{{ one_genre['genre'] }}</option>
+        {% endfor %}
+    </select>
+
+    <input type="text" name="actor" placeholder="Actor first or last name">
     <input type="submit" value="Search">
 </form>
 
