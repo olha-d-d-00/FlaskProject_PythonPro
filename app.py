@@ -1,9 +1,14 @@
 import functools
-
+import os
+from dateutil import parser
+from sqlalchemy import select
+import database
 from click import password_option
 from flask import Flask, render_template, redirect, url_for
 from flask import request, session
 import sqlite3
+import models
+
 app = Flask(__name__)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
@@ -71,10 +76,15 @@ def user_register():
     password = request.form['password']
     login = request.form['login']
     email = request.form['email']
-    birth_date = request.form['birth_date']
-    with db_connection() as cur:
-        cur.execute('INSERT INTO user (first_name, last_name, password, login, email, birth_date) VALUES (?, ?, ?, ?, ?, ?)',
-                    (first_name, last_name, password, login, email, birth_date))
+    birth_date = parser.parse(request.form['birth_date'])
+
+    database.init_db()
+
+    new_user = models.User(first_name=first_name, last_name=last_name, password=password, login=login, email=email, birth_date=birth_date)
+
+    database.db_session.add(new_user)
+    database.db_session.commit()
+
     return 'Register'
 
 @app.route('/login', methods=['GET'])
@@ -86,12 +96,22 @@ def user_login():
 def user_login_post():
     login = request.form['login']
     password = request.form['password']
-    with db_connection() as cur:
-        cur.execute('SELECT * FROM user WHERE login=? AND password=?', (login, password))
-        result = cur.fetchone()
+
+
+    database.init_db()
+
+    stmt = select(models.User).where(models.User.login == login, models.User.password == password)
+    data = database.db_session.execute(stmt).fetchall()
+    if data:
+        user_obj = data[0][0]
+
+
+    result = database.db_session.query(models.User).filter_by(login=login, password=password).first()
+    # result == user_obj
+
     if result:
         session['logged_in'] = True
-        session['user_id'] = result['id']
+        session['user_id'] = result.id
         return f'Login with user {result}'
     return 'Login failed'
 
