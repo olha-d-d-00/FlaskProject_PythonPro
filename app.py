@@ -100,10 +100,11 @@ def user_login_post():
 
     database.init_db()
 
-    stmt = select(models.User).where(models.User.login == login, models.User.password == password)
-    data = database.db_session.execute(stmt).fetchall()
-    if data:
-        user_obj = data[0][0]
+    # v2
+    # stmt = select(models.User).where(models.User.login == login, models.User.password == password)
+    # data = database.db_session.execute(stmt).fetchall()
+    # if data:
+    #     user_obj = data[0][0]
 
 
     result = database.db_session.query(models.User).filter_by(login=login, password=password).first()
