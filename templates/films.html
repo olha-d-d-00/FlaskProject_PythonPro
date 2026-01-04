@@ -17,13 +17,6 @@
         {% endfor %}
     </select>
 
-    <select name="genre" id="genre">
-        <option value="">-- any genre --</option>
-        {% for one_genre in genres %}
-            <option value="{{ one_genre['genre'] }}">{{ one_genre['genre'] }}</option>
-        {% endfor %}
-    </select>
-
     <input type="text" name="actor" placeholder="Actor first or last name">
     <input type="submit" value="Search">
 </form>
