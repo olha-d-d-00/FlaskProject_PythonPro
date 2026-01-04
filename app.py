@@ -196,7 +196,7 @@ def films_info(film_id):
     actors = select(models.Actor).join(models.ActorFilm, models.Actor.id == models.ActorFilm.actor_id).where(models.ActorFilm.film_id == film_id)
     result_actors = database.db_session.execute(actors).scalars()
 
-    genres = select(models.Genre).join(models.GenreFilm, models.Genre.genre == models.GenreFilm.genre_id).where(models.GenreFilm == film_id)
+    genres = (select(models.Genre).join(models.GenreFilm, models.Genre.genre == models.GenreFilm.genre_id).where(models.GenreFilm.film_id == film_id))
     result_genres = database.db_session.execute(genres).scalars()
 
     return jsonify({
