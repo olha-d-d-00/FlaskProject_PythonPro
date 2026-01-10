@@ -13,6 +13,10 @@ class User(Base):
     photo = Column(String(255))
     additional_info = Column(String(255))
     birth_date = Column(Date)
+    last_login = Column(Date)
+    created_at = Column(Date, nullable=False)
+    logged_out_at = Column(Date)
+    logged_out_at2 = Column(Date)
 
     def __repr__(self):
         return f'<User {self.login!r}>'
@@ -44,6 +48,7 @@ class Film(Base):
     duration = Column(Integer, nullable=False)
     added_at = Column(Integer, nullable=False)
     country = Column(String(50), nullable=False)
+    votes_amount = Column(Integer)
 
     def __repr__(self):
         return f'<Film {self.name!r}>'
@@ -61,11 +66,18 @@ class Genre(Base):
     def to_dict(self):
         return {"genre": self.genre}
 
+# class GenreFilm(Base):
+#     __tablename__ = 'genre_film'
+#     id = Column(Integer, primary_key=True)
+#     genre_id = Column(Integer, ForeignKey('genre.genre'))
+#     film_id = Column(Integer, ForeignKey('film.id'))
+
 class GenreFilm(Base):
     __tablename__ = 'genre_film'
     id = Column(Integer, primary_key=True)
-    genre_id = Column(Integer, ForeignKey('genre.genre'))
-    film_id = Column(Integer, ForeignKey('film.id'))
+    genre_id = Column(String(50), ForeignKey('genre.genre'), nullable=False)
+    film_id = Column(Integer, ForeignKey('film.id'), nullable=False)
+
 
 class ActorFilm(Base):
     __tablename__ = 'actor_film'
@@ -78,6 +90,7 @@ class List(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('user.id'))
     name = Column(String(50), nullable=False)
+    created_at = Column(Date)
 
 class FilmList(Base):
     __tablename__ = 'film_list'

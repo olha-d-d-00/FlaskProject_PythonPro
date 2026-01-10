@@ -3,7 +3,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
-engine = create_engine('sqlite:///database.db') #для теста поменять на "database.db"
+engine = create_engine("postgresql://postgres:qwerty@localhost:5432/postgres") #для теста поменять на "database_alembic.db"  sqlite:///database_alembic.db
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))
