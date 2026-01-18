@@ -10,15 +10,16 @@ def happy_ticket(start_number, end_number, thread_num):
     for i in range(start_number, end_number):
         if find_happy_nums(i):
             count += 1
-            print(i, end=', ')
+            # print(i, end=', ') #раскоментировать чтобы получить подробную информацию о lucky числах
 
     print(f"{thread_num}: {count}")
 
 
-def find_happy_nums(num):
-    digits = list(map(int, str(num)))
-    mid_num = len(digits) // 2
-    return sum(digits[:mid_num]) == sum(digits[mid_num:])
+def find_happy_nums(num: int) -> bool:
+    digits = str(num).zfill(6)
+    first_half = digits[:3]
+    last_half = digits[3:]
+    return sum(map(int, first_half)) == sum(map(int, last_half))
 
 
 if __name__ == '__main__':
@@ -26,12 +27,17 @@ if __name__ == '__main__':
     logging.basicConfig(format=format, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
+
+    START_NUMBER_TICKET = 0
+    END_NUMBER_TICKET = 1000000
+    MIDDLE_NUM = (START_NUMBER_TICKET + END_NUMBER_TICKET) // 2
+
     logging.info("Main      : before creating thread")
     # Раскомментировать при переведении на Threading
     # x1 = threading.Thread(target=happy_ticket, args=(100000, 100500, "thread 1"))
     # x2 = threading.Thread(target=happy_ticket, args=(200000, 200500, "thread 2"))
-    x1 = Process(target=happy_ticket, args=(100000, 100500, "thread 1"))
-    x2 = Process(target=happy_ticket, args=(200000, 200500, "thread 2"))
+    x1 = Process(target=happy_ticket, args=(START_NUMBER_TICKET, MIDDLE_NUM, "thread 1"))
+    x2 = Process(target=happy_ticket, args=(MIDDLE_NUM, END_NUMBER_TICKET, "thread 2"))
     logging.info("Main      : before running thread")
     t1 = datetime.datetime.now()
     x1.start()
