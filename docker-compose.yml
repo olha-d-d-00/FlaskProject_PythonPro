@@ -1,0 +1,48 @@
+version: "3.8"
+services:
+  webapp:
+    build: .
+    container_name: webapp_container
+    ports:
+      - "5050:5000"
+    command: python app.py
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    depends_on:
+      - database
+      - rabbitmq
+
+  celery_worker:
+    build: .
+    container_name: celery_worker_container
+    command: celery -A email_worker worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    depends_on:
+      - database
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_container
+    hostname: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+  database:
+    image: postgres:13
+    container_name: database_container
+    ports:
+      - 5433:5432
+    hostname: database
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword

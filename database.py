@@ -1,9 +1,11 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
-engine = create_engine("postgresql://postgres:qwerty@localhost:5432/postgres") #для теста поменять на "database_alembic.db"  sqlite:///database_alembic.db
+# engine = create_engine("postgresql://postgres:qwerty@localhost:5432/postgres") #для теста поменять на "database_alembic.db"  sqlite:///database_alembic.db
+engine = create_engine(os.environ["DATABASE_URL"])
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))

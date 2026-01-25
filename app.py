@@ -7,6 +7,9 @@ from click import password_option
 from flask import Flask, render_template, redirect, url_for, jsonify
 from flask import request, session
 import sqlite3
+import secrets
+
+import email_worker
 import models
 from models import ActorFilm
 
@@ -38,6 +41,12 @@ def register_page():
     return render_template('register.html')
 
 
+def create_and_save_confirmation(user_id, email):
+    return secrets.token_hex(4)
+
+def build_message_body_for_confirmation(code, user_first_name):
+    return f""" Hi {user_first_name}! Your confirmation code: {code}"""
+
 @app.route('/register', methods=['POST'])
 def user_register():
     first_name = request.form['fname']
@@ -50,8 +59,16 @@ def user_register():
     database.init_db()
 
     new_user = models.User(first_name=first_name, last_name=last_name, password=password, login=login, email=email, birth_date=birth_date)
-
+    new_user.active = False
     database.db_session.add(new_user)
+    database.db_session.flush()
+
+    secret_code = create_and_save_confirmation(new_user.id, new_user.email)
+    message_body = build_message_body_for_confirmation(secret_code, user_first_name=new_user.first_name)
+    email_worker.send_email.delay("Confirm your email", message_body, new_user.email)
+
+
+
     database.db_session.commit()
 
     return 'Register'
@@ -326,4 +343,4 @@ def user_list_item_delete(user_id, list_id, film_id):
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0')

@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 import models
 target_metadata = models.Base.metadata
 
-# other values from the config, defined by the needs of env.py,
+# other values from the config, defined by the needs of .env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.

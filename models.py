@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Date, ForeignKey
 from database import Base
+from datetime import date
 
 class User(Base):
     __tablename__ = 'user'
@@ -14,7 +15,7 @@ class User(Base):
     additional_info = Column(String(255))
     birth_date = Column(Date)
     last_login = Column(Date)
-    created_at = Column(Date, nullable=False)
+    created_at = Column(Date, nullable=False, default=date.today)
     logged_out_at = Column(Date)
     logged_out_at2 = Column(Date)
 
