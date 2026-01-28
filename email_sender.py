@@ -1,5 +1,6 @@
 import os
 import smtplib
+import database
 from flask import render_template
 
 def queue_filter(email_queue):
@@ -7,7 +8,7 @@ def queue_filter(email_queue):
         data = database.db_session.execute(stmt).fetchall()
         for itm in data:
             email_queue.put(itm)
-            # todo: delete data in the db that  was put in queue
+            # todo: delete data in the db that was put in queue
 
 def send_email_confirmation(email_queue):
     while True:

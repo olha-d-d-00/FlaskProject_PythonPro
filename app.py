@@ -1,20 +1,33 @@
-import functools
 import os
-from dateutil import parser
-from sqlalchemy import select, update, func, delete
-import database
-from click import password_option
-from flask import Flask, render_template, redirect, url_for, jsonify
-from flask import request, session
-import sqlite3
+import functools
 import secrets
+import random
+import string
 
+from celery.worker.control import active
+
+import database
 import email_worker
 import models
-from models import ActorFilm
+from dateutil import parser
+from flask import Flask, render_template, redirect, url_for, jsonify
+from flask import request, session
+from sqlalchemy import select, update, func, delete
+
 
 app = Flask(__name__)
-app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
+app.secret_key = os.getenv("SECRET_KEY")
+
+
+def check_user_allowance(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        user_id_from_endpoint= request.view_args['user_id']
+        user_id_from_session = session.get("user_id")
+        if user_id_from_endpoint != user_id_from_session:
+            raise Exception("Unauthorized")
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def decorator_check_login(func):
@@ -40,9 +53,12 @@ def main_page():  # put application's code here
 def register_page():
     return render_template('register.html')
 
+CONFIRMATIONS = {}
 
 def create_and_save_confirmation(user_id, email):
-    return secrets.token_hex(4)
+    code = secrets.token_hex(4)
+    CONFIRMATIONS[email] = {"code": code, "user_id": user_id}
+    return code
 
 def build_message_body_for_confirmation(code, user_first_name):
     return f""" Hi {user_first_name}! Your confirmation code: {code}"""
@@ -66,9 +82,6 @@ def user_register():
     secret_code = create_and_save_confirmation(new_user.id, new_user.email)
     message_body = build_message_body_for_confirmation(secret_code, user_first_name=new_user.first_name)
     email_worker.send_email.delay("Confirm your email", message_body, new_user.email)
-
-
-
     database.db_session.commit()
 
     return 'Register'
@@ -101,6 +114,32 @@ def user_login_post():
         session['user_id'] = result.id
         return f'Login with user {result}'
     return 'Login failed'
+
+@app.route('/confirm', methods=['POST'])
+def confirm_email():
+    code = request.form["code"]
+    email = request.form["email"]
+
+    record = CONFIRMATIONS.get(email)
+    if not record:
+        return "Without confirmation request for this email", 400
+
+    if code != record["code"]:
+        return "Wrong code", 400
+
+    database.init_db()
+    stmt = (
+        update(models.User)
+        .where(models.User.id == record["user_id"])
+        .values(active=True)
+    )
+
+    database.db_session.execute(stmt)
+    database.db_session.commit()
+
+    del CONFIRMATIONS[email]
+
+    return "Confirmed"
 
 @app.route('/logout', methods=['GET'])
 @decorator_check_login
@@ -150,7 +189,12 @@ def user_profile(user_id):
 @app.route('/user/<user_id>/delete', methods=['GET'])
 def user_delete(user_id):
     session_user_id = session.get('user_id')
-    if user_id == session_user_id:
+    if int(user_id) == session_user_id:
+        database.init_db()
+        stmt = delete(models.User).where(models.User.id == user_id)
+        database.db_session.execute(stmt)
+        database.db_session.commit()
+        database.db_session.close()
         return f'User {user_id} delete'
     else:
         return 'You can delete only your profile'
@@ -159,8 +203,8 @@ def user_delete(user_id):
 @decorator_check_login
 def films():
     filter_params = request.args
-    filter_list_texts = []
     films_query = select(models.Film)
+
     for key, value in filter_params.items():
         if value:
             if key == 'name':
@@ -173,6 +217,11 @@ def films():
                     films_query = films_query.where(models.Film.country == value)
                 if key == 'year':
                     films_query = films_query.where(models.Film.year == int(value))
+                if key == 'genre':
+                    films_query = films_query.join(models.GenreFilm, models.GenreFilm.film_id == models.Film.id) \
+                        .join(models.Genre, models.Genre.genre == models.GenreFilm.genre_id) \
+                        .where(models.Genre.genre == value )
+
 
     films = films_query.order_by(models.Film.added_at.desc())
     result_films = database.db_session.execute(films).scalars()
@@ -193,15 +242,26 @@ def film_add():
     description = data.get('description')
     rating = data.get('rating')
     country = data.get('country')
+    year = data.get("year")
+    duration = data.get("duration")
 
     if not name:
         return jsonify({"error": "name is required"}), 400
 
-    new_film = models.Film(name=name, poster=poster, description=description, rating=rating, country=country)
-    result = database.db_session.add(new_film)
+    new_film = models.Film(
+        name=name,
+        poster=poster,
+        description=description,
+        rating=rating,
+        country=country,
+        year=year,
+        duration=duration
+    )
+
+    database.db_session.add(new_film)
     database.db_session.commit()
 
-    return jsonify({"film_id": new_film.id}), 201
+    return redirect(url_for(f"/films/{new_film.id}"))
 
 @app.route('/films/<int:film_id>', methods=['GET'])
 def films_info(film_id):
@@ -247,7 +307,7 @@ def film_update(film_id):
     return jsonify({"film_id": film_id})
 
 
-@app.route('/films/<int:film_id>', methods=['DELETE'])
+@app.route('/films/<int:film_id>/delete', methods=['GET'])
 @decorator_check_login
 def film_delete(film_id):
     database.init_db()
@@ -260,19 +320,6 @@ def film_delete(film_id):
         return jsonify({"error": "Film not found"}), 404
 
     return jsonify({"film_id": film_id})
-
-
-@app.route('/films/search', methods=['GET'])
-def films_search():
-    name = request.args.get('name', '')
-
-    database.init_db()
-
-    film_search_query = select(models.Film).where(models.Film.name.like(f"%{name}%")).order_by(models.Film.added_at.desc())
-    result_film_seach = database.db_session.execute(film_search_query).scalars()
-
-
-    return jsonify(itm.to_dict() for itm in result_film_seach)
 
 
 
@@ -299,13 +346,44 @@ def film_rating_info(film_id):
     })
 
 
-@app.route('/films/<int:film_id>/rating/<feedback_id>', methods=['DELETE'])
+@app.route('/films/<int:film_id>/rating/<feedback_id>/delete', methods=['GET'])
 def film_rating_delete(film_id, feedback_id):
-    return f'Film {film_id} rating {feedback_id} deleted'
+    database.init_db()
 
-@app.route('/films/<film_id>/rating/<feedback_id>', methods=['PUT'])
+    stmt = delete(models.Feedback).where(
+        models.Feedback.id == feedback_id,
+        models.Feedback.film == film_id
+    )
+
+    res = database.db_session.execute(stmt)
+    database.db_session.commit()
+
+    if res.rowcount == 0:
+        return jsonify({"error": "feedback not found"}), 404
+
+    return jsonify({"feedback_id": feedback_id})
+
+
+@app.route('/films/<film_id>/rating/<feedback_id>', methods=['POST'])
 def film_rating_update(film_id, feedback_id):
-    return f'Film {film_id} rating {feedback_id} updated'
+    database.init_db()
+    data = request.get_json() or {}
+
+    stmt = (
+        update(models.Feedback)
+        .where(models.Feedback.id == feedback_id, models.Feedback.film == film_id)
+        .values(
+            grade=data.get("grade"),
+            description=data.get("description")
+        )
+    )
+    res = database.db_session.execute(stmt)
+    database.db_session.commit()
+
+    if res.rowcount == 0:
+        return jsonify({"error": "feedback not found"}), 404
+
+    return jsonify({"feedback_id": feedback_id})
 
 @app.route('/films/<film_id>/rating/<feedback_id>/feedback', methods=['GET'])
 def film_rating_feedback(film_id, feedback_id):
@@ -324,23 +402,48 @@ def film_rating_feedback(film_id, feedback_id):
         "grade": row[1]
     })
 
+@app.route('/users/<user_id>/list', methods=['GET'])
+def user_list(user_id):# get all user lists
+    database.init_db()
+    lists_query = select(models.FilmList).filter_by(user_id=user_id)
+    lists = database.db_session.execute(lists_query).scalars().all()
+    return f"All user lists: {lists}"
 
-@app.route('/users/<user_id>/list', methods=['GET', 'POST'])
-def user_list(user_id):
-    return f'User {user_id} list'
-
-@app.route('/users/<user_id>/list', methods=['DELETE'])
-def user_list_delete(user_id):
-    return f'User {user_id} list deleted'
+@app.route('/users/<user_id>/list', methods=['POST'])
+def create_user_list(user_id): # create new list
+    database.init_db()
+    pass
 
 @app.route('/users/<user_id>/list/<list_id>', methods=['GET', 'POST'])
+@decorator_check_login
 def user_list_item(user_id, list_id):
-    return f'User {user_id} list item {list_id}'
+    database.init_db()
+    if request.method == "POST": #add film to list
+        if user_id != session.get('user_id'):
+            return "You can edit only your prifile"
 
-@app.route('/users/<user_id>/list/<list_id>/<film_id>', methods=['DELETE'])
+        film_id = request.form["film_id"]
+        list = models.FilmList(film_id=film_id, list_id=list_id)
+
+        database.db_session.add(list)
+        database.db_session.commit()
+        return f'User {user_id} list item {list_id}'
+    else:
+        list_query = select(models.FilmList).join(models.Film, models.FilmList.film_id == models.Film.id).filter_by(list_id=list_id)
+        get_list = database.db_session.execute(list_query).scalars().all()
+        return f"List {list_id}: {get_list}"
+
+
+@app.route('/users/<user_id>/list/<list_id>/<film_id>/delete', methods=['GET'])
+@decorator_check_login
+@check_user_allowance
 def user_list_item_delete(user_id, list_id, film_id):
-    return f'User {user_id} list item {list_id} deleted'
+        database.init_db()
+        deleted_film = delete(models.FilmList).where(models.FilmList.film_id == film_id, models.FilmList.list_id == list_id)
+        database.db_session.execute(deleted_film)
+        database.db_session.commit()
+        return f'User {user_id} list item {film_id} from list {list_id} deleted'
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', debug=True)

@@ -90,7 +90,6 @@ class List(Base):
     __tablename__ = 'list'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('user.id'))
-    name = Column(String(50), nullable=False)
     created_at = Column(Date)
 
 class FilmList(Base):
