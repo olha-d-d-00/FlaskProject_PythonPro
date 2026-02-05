@@ -40,7 +40,7 @@ services:
     image: postgres:13
     container_name: database_container
     ports:
-      - 5433:5432
+      - 5435:5432
     hostname: database
     environment:
       POSTGRES_DB: mydatabase

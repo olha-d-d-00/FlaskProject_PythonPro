@@ -105,14 +105,13 @@ def user_login_post():
     # if data:
     #     user_obj = data[0][0]
 
-
     result = database.db_session.query(models.User).filter_by(login=login, password=password).first()
     # result == user_obj
 
     if result:
         session['logged_in'] = True
         session['user_id'] = result.id
-        return f'Login with user {result}'
+        return redirect(url_for('user_profile', user_id=result.id))
     return 'Login failed'
 
 @app.route('/confirm', methods=['POST'])
@@ -263,6 +262,7 @@ def film_add():
 
     return redirect(url_for(f"/films/{new_film.id}"))
 
+
 @app.route('/films/<int:film_id>', methods=['GET'])
 def films_info(film_id):
     database.init_db()
@@ -276,6 +276,7 @@ def films_info(film_id):
     genres = (select(models.Genre).join(models.GenreFilm, models.Genre.genre == models.GenreFilm.genre_id).where(models.GenreFilm.film_id == film_id))
     result_genres = database.db_session.execute(genres).scalars()
 
+
     return jsonify({
         "id": result_film_by_id.id,
         "name": result_film_by_id.name,
@@ -287,6 +288,7 @@ def films_info(film_id):
         "actors": [itm.to_dict() for itm in result_actors],
         "genres": [itm.to_dict() for itm in result_genres]
     })
+
 
 @app.route('/films/<film_id>', methods=['PUT'])
 def film_update(film_id):
@@ -304,7 +306,7 @@ def film_update(film_id):
     database.db_session.add(new_film)
     database.db_session.commit()
 
-    return jsonify({"film_id": film_id})
+    return redirect(url_for("film_page", film_id=film_id))
 
 
 @app.route('/films/<int:film_id>/delete', methods=['GET'])
