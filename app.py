@@ -260,34 +260,34 @@ def film_add():
     database.db_session.add(new_film)
     database.db_session.commit()
 
-    return redirect(url_for(f"/films/{new_film.id}"))
+    return redirect(url_for("film_page", film_id=new_film.id))
 
 
-@app.route('/films/<int:film_id>', methods=['GET'])
-def films_info(film_id):
-    database.init_db()
-
-    film_by_id = select(models.Film).where(models.Film.id == film_id)
-    result_film_by_id = database.db_session.execute(film_by_id).scalar_one()
-
-    actors = select(models.Actor).join(models.ActorFilm, models.Actor.id == models.ActorFilm.actor_id).where(models.ActorFilm.film_id == film_id)
-    result_actors = database.db_session.execute(actors).scalars()
-
-    genres = (select(models.Genre).join(models.GenreFilm, models.Genre.genre == models.GenreFilm.genre_id).where(models.GenreFilm.film_id == film_id))
-    result_genres = database.db_session.execute(genres).scalars()
-
-
-    return jsonify({
-        "id": result_film_by_id.id,
-        "name": result_film_by_id.name,
-        "poster": result_film_by_id.poster,
-        "description": result_film_by_id.description,
-        "rating": result_film_by_id.rating,
-        "country": result_film_by_id.country,
-        "added_at": result_film_by_id.added_at,
-        "actors": [itm.to_dict() for itm in result_actors],
-        "genres": [itm.to_dict() for itm in result_genres]
-    })
+# @app.route('/films/<int:film_id>', methods=['GET'])
+# def films_info(film_id):
+#     database.init_db()
+#
+#     film_by_id = select(models.Film).where(models.Film.id == film_id)
+#     result_film_by_id = database.db_session.execute(film_by_id).scalar_one()
+#
+#     actors = select(models.Actor).join(models.ActorFilm, models.Actor.id == models.ActorFilm.actor_id).where(models.ActorFilm.film_id == film_id)
+#     result_actors = database.db_session.execute(actors).scalars()
+#
+#     genres = (select(models.Genre).join(models.GenreFilm, models.Genre.genre == models.GenreFilm.genre_id).where(models.GenreFilm.film_id == film_id))
+#     result_genres = database.db_session.execute(genres).scalars()
+#
+#
+#     return jsonify({
+#         "id": result_film_by_id.id,
+#         "name": result_film_by_id.name,
+#         "poster": result_film_by_id.poster,
+#         "description": result_film_by_id.description,
+#         "rating": result_film_by_id.rating,
+#         "country": result_film_by_id.country,
+#         "added_at": result_film_by_id.added_at,
+#         "actors": [itm.to_dict() for itm in result_actors],
+#         "genres": [itm.to_dict() for itm in result_genres]
+#     })
 
 
 @app.route('/films/<film_id>', methods=['PUT'])
@@ -308,6 +308,36 @@ def film_update(film_id):
 
     return redirect(url_for("film_page", film_id=film_id))
 
+
+@app.route('/films/<int:film_id>', methods=['GET'])
+@decorator_check_login
+def film_page(film_id):
+    database.init_db()
+
+    film = database.db_session.execute(
+        select(models.Film).where(models.Film.id == film_id)
+    ).scalar_one()
+
+    return render_template("film.html", film=film)
+
+
+@app.route('/api/films/<int:film_id>', methods=['GET'])
+def films_info_api(film_id):
+    database.init_db()
+
+    film = database.db_session.execute(
+        select(models.Film).where(models.Film.id == film_id)
+    ).scalar_one()
+
+    return jsonify({
+        "id": film.id,
+        "name": film.name,
+        "poster": film.poster,
+        "description": film.description,
+        "rating": film.rating,
+        "country": film.country,
+        "added_at": film.added_at,
+    })
 
 @app.route('/films/<int:film_id>/delete', methods=['GET'])
 @decorator_check_login
